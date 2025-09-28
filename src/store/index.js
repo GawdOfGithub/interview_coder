@@ -1,10 +1,19 @@
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
-import { persistStore, persistReducer } from 'redux-persist';
-import storage from 'redux-persist/lib/storage'; // defaults to localStorage for web
+import { 
+    persistStore, 
+    persistReducer,
+    // ✅ 1. Import all the action types
+    FLUSH,
+    REHYDRATE,
+    PAUSE,
+    PERSIST,
+    PURGE,
+    REGISTER,
+} from 'redux-persist';
+import storage from 'redux-persist/lib/storage';
 import candidatesReducer from './slices/candidatesSlice';
 import interviewReducer from './slices/interviewSlice';
 
-// Placeholder for slices - will be created in next steps
 const rootReducer = combineReducers({
     candidates: candidatesReducer,
     interview: interviewReducer,
@@ -13,6 +22,8 @@ const rootReducer = combineReducers({
 const persistConfig = {
     key: 'root',
     storage,
+    // Best practice: only persist the slice you need
+    whitelist: ['interview'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);
@@ -22,7 +33,8 @@ export const store = configureStore({
     middleware: (getDefaultMiddleware) =>
         getDefaultMiddleware({
             serializableCheck: {
-                ignoredActions: ['persist/PERSIST', 'persist/REHYDRATE'],
+                // ✅ 2. Use the full list of ignored actions
+                ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
             },
         }),
 });

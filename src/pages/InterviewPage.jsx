@@ -127,26 +127,38 @@ const ChatView = ({ extractedName }) => {
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (newMessage.trim() === '') return;
-
-        console.log('handleSendMessage called:', { interviewStarted, extractedName, currentCandidateId, newMessage });
-
+    
         const userMessage = { sender: 'user', text: newMessage };
         dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: userMessage }));
-
-        if (!interviewStarted && newMessage.trim().toLowerCase() === 'start') {
-            console.log('Attempting to start interview...');
-            dispatch(setInterviewStarted(true));
-            const aiStartMessage = { sender: 'ai', text: `Great! Let's begin. Based on your experience with React, can you explain the concept of "lifting state up"?` };
+    
+        // --- REVISED LOGIC ---
+        // Always prioritize the 'start' command to begin or restart the interview.
+        if (newMessage.trim().toLowerCase() === 'start') {
+            dispatch(setInterviewStarted(true)); // Set the flag to true
+            const aiStartMessage = { 
+                sender: 'ai', 
+                text: `Great! Let's begin. Based on your experience with React, can you explain the concept of "lifting state up"?` 
+            };
             dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiStartMessage }));
-            navigate('/question');
-        } else if (interviewStarted) {
-            const aiResponse = { sender: 'ai', text: 'That\'s a great point. Can you elaborate on when you would choose that approach over using a state management library like Redux or Zustand?' };
+            navigate('/question'); // Navigate to the quiz
+        } 
+        // If the interview is in progress and the message is NOT 'start', give a generic response.
+        else if (interviewStarted) {
+            const aiResponse = { 
+                sender: 'ai', 
+                text: 'That\'s a great point. Can you elaborate on when you would choose that approach over using a state management library like Redux or Zustand?' 
+            };
             dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiResponse }));
-        } else {
-            const aiPromptMessage = { sender: 'ai', text: "Please enter 'Start' to begin the interview." };
+        } 
+        // If the interview has NOT started and the message is NOT 'start', prompt the user.
+        else {
+            const aiPromptMessage = { 
+                sender: 'ai', 
+                text: "Please enter 'Start' to begin the interview." 
+            };
             dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiPromptMessage }));
         }
-
+    
         setNewMessage('');
     };
 
