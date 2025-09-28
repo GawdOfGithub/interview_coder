@@ -10,6 +10,8 @@ import Hero from './components/sections/Hero';
 import FeatureCard from './components/features/FeatureCard';
 import Features from './components/sections/Features';
 import Persistence from './components/sections/Persistence';
+import { createBrowserRouter } from "react-router";
+import { RouterProvider } from "react-router/dom";
 
 // Helper: Mock UI Components
 
