@@ -14,7 +14,7 @@ import {
     setLoadingQuestions,
     setError 
 } from '../store/slices/interviewSlice';
-import { updateCandidateScore, updateCandidateAiSummary } from '../store/slices/candidatesSlice';
+import { updateCandidateScore, updateCandidateAiSummary, clearCandidateAiSummary } from '../store/slices/candidatesSlice';
 
 // --- Timer Component (Unchanged) ---
 const CircularTimer = ({ timeLeft, totalTime }) => {
@@ -59,10 +59,13 @@ export default function QuestionPage() {
         timeLeft, 
         loadingQuestions, 
         currentCandidateId,
-        error
+        error,
     } = useSelector((state) => state.interview);
 
     const currentQuestion = useMemo(() => quizQuestions?.[currentQuestionIndex], [quizQuestions, currentQuestionIndex]);
+    const aiSummary = useSelector((state) => 
+        state.candidates.list.find(c => c.id === currentCandidateId)?.aiSummary
+    );
 
     // --- Fetch Questions from Backend ---
     useEffect(() => {
@@ -94,58 +97,49 @@ export default function QuestionPage() {
     }, [dispatch, quizQuestions.length, loadingQuestions, currentCandidateId, error]);
 
     // --- Submission Logic ---
-    // ✅ 1. handleNextStep NOW resets the timer for the next question
     const handleNextStep = useCallback(() => {
-      const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
-      if (isLastQuestion) {
-          dispatch(setQuizFinished(true));
-      } else {
-          const nextQuestionIndex = currentQuestionIndex + 1;
-          const nextQuestion = quizQuestions[nextQuestionIndex];
-
-          // Set state for the next question
-          dispatch(setCurrentQuestionIndex(nextQuestionIndex));
-          dispatch(setSelectedOption(null));
-          
-          // Reset the timer for the upcoming question
-          if (nextQuestion) {
-              dispatch(setTimeLeft(nextQuestion.timeLimit));
-          }
-      }
-  }, [currentQuestionIndex, quizQuestions, dispatch]);
-  
-  const handleSubmit = useCallback(() => {
-      // Guard against calls before questions are loaded
-      if (!currentQuestion) return;
-      
-      const timeTaken = currentQuestion.timeLimit - timeLeft;
-      const isCorrect = selectedOption === currentQuestion.correctAnswer;
-      
-      if (isCorrect) {
-          dispatch(incrementScore());
-      }
-  
-      dispatch(addAnswer({ 
-          question: currentQuestion.question, 
-          answer: selectedOption, 
-          isCorrect, 
-          timeTaken 
-      }));
-      
-      // This will now correctly prepare for the next question
-      handleNextStep();
-  }, [selectedOption, currentQuestion, timeLeft, handleNextStep, dispatch]);
+        const isLastQuestion = currentQuestionIndex === quizQuestions.length - 1;
+        if (isLastQuestion) {
+            dispatch(setQuizFinished(true));
+        } else {
+            const nextQuestionIndex = currentQuestionIndex + 1;
+            const nextQuestion = quizQuestions[nextQuestionIndex];
+            dispatch(setCurrentQuestionIndex(nextQuestionIndex));
+            dispatch(setSelectedOption(null));
+            if (nextQuestion) {
+                dispatch(setTimeLeft(nextQuestion.timeLimit));
+            }
+        }
+    }, [currentQuestionIndex, quizQuestions, dispatch]);
  
+    const handleSubmit = useCallback(() => {
+        if (!currentQuestion) return;
+        
+        const timeTaken = currentQuestion.timeLimit - timeLeft;
+        const isCorrect = selectedOption === currentQuestion.correctAnswer;
+        
+        if (isCorrect) {
+            dispatch(incrementScore());
+        }
+ 
+        dispatch(addAnswer({ 
+            question: currentQuestion.question, 
+            answer: selectedOption, 
+            isCorrect, 
+            timeTaken 
+        }));
+        
+        handleNextStep();
+    }, [selectedOption, currentQuestion, timeLeft, handleNextStep, dispatch]);
+
     // --- Effects for Timer Management ---
     useEffect(() => {
         if (quizFinished || loadingQuestions || !currentQuestion) {
             return;
         }
-    
         const timerId = setInterval(() => {
             dispatch(decrementTime());
         }, 1000);
-    
         return () => clearInterval(timerId);
     }, [quizFinished, loadingQuestions, currentQuestion, dispatch]); 
     
@@ -154,11 +148,6 @@ export default function QuestionPage() {
             handleSubmit(); 
         }
     }, [timeLeft, quizFinished, handleSubmit, loadingQuestions]);
- 
-    /*
-        ✅ 3. The problematic useEffect has been completely removed.
-        There is no longer a useEffect that depends on currentQuestionIndex to reset the timer.
-    */
 
     // --- Derived State for Performance Metrics & Summary ---
     const performance = useMemo(() => {
@@ -166,64 +155,73 @@ export default function QuestionPage() {
         const accuracy = (score / quizQuestions.length) * 100;
         const totalTimeTaken = userAnswers.reduce((acc, ans) => acc + ans.timeTaken, 0);
         const avgTime = quizQuestions.length > 0 ? totalTimeTaken / quizQuestions.length : 0;
-        let summaryText, summaryColor;
+        const summaryText = aiSummary || "Generating AI analysis...";
+        let summaryColor;
         if (accuracy >= 80) {
-            summaryText = "High Performance! You have a strong grasp of the concepts.";
             summaryColor = "text-green-400";
         } else if (accuracy >= 50) {
-            summaryText = "Average Performance. Good effort, with room for improvement.";
             summaryColor = "text-yellow-400";
         } else {
-            summaryText = "Poor Performance. It looks like you need more practice on these topics.";
             summaryColor = "text-red-400";
         }
         return { accuracy, avgTime, summaryText, summaryColor };
+    }, [quizFinished, score, userAnswers, quizQuestions.length, aiSummary]);
+
+    const performanceMetrics = useMemo(() => {
+        if (!quizFinished || quizQuestions.length === 0) return null;
+        
+        const accuracy = (score / quizQuestions.length) * 100;
+        const totalTimeTaken = userAnswers.reduce((acc, ans) => acc + ans.timeTaken, 0);
+        const avgTime = quizQuestions.length > 0 ? totalTimeTaken / quizQuestions.length : 0;
+        
+        return { accuracy, avgTime };
     }, [quizFinished, score, userAnswers, quizQuestions.length]);
 
     // --- Backend Score Submission ---
     useEffect(() => {
         const submitScore = async () => {
-            if (quizFinished && performance && currentCandidateId) {
+            if (quizFinished && performanceMetrics && currentCandidateId) {
                 try {
                     const response = await fetch('http://localhost:3000/submit-quiz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ candidateId: currentCandidateId, score: parseFloat(performance.accuracy.toFixed(0)) }),
+                        body: JSON.stringify({ candidateId: currentCandidateId, score: parseFloat(performanceMetrics.accuracy.toFixed(0)) }),
                     });
-                    const result = await response.json();
-                    if (response.ok) {
-                        dispatch(updateCandidateScore({ candidateId: currentCandidateId, scoreValue: parseFloat(performance.accuracy.toFixed(0)) }));
-                        const summaryResponse = await fetch('http://localhost:3000/generate-summary', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ 
-                                candidateId: currentCandidateId, 
-                                performance: { 
-                                    accuracy: performance.accuracy.toFixed(0), 
-                                    avgTime: performance.avgTime.toFixed(1) 
-                                }, 
-                                userAnswers 
-                            }),
-                        });
-                        const summaryResult = await summaryResponse.json();
-                        if (summaryResponse.ok) {
-                            dispatch(updateCandidateAiSummary({ candidateId: currentCandidateId, aiSummary: summaryResult.aiSummary }));
-                        } else {
-                            console.error('Error generating AI summary:', summaryResult.error);
-                        }
+                    if (!response.ok) throw new Error('Failed to submit score');
+                    
+                    dispatch(updateCandidateScore({ candidateId: currentCandidateId, scoreValue: parseFloat(performanceMetrics.accuracy.toFixed(0)) }));
+
+                    const summaryResponse = await fetch('http://localhost:3000/generate-summary', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            candidateId: currentCandidateId, 
+                            performance: { 
+                                accuracy: performanceMetrics.accuracy.toFixed(0), 
+                                avgTime: performanceMetrics.avgTime.toFixed(1) 
+                            }, 
+                            userAnswers 
+                        }),
+                    });
+                    const summaryResult = await summaryResponse.json();
+                    if (summaryResponse.ok) {
+                        dispatch(updateCandidateAiSummary({ candidateId: currentCandidateId, aiSummary: summaryResult.aiSummary }));
                     } else {
-                        console.error('Error submitting score to backend:', result.error);
+                        console.error('Error generating AI summary:', summaryResult.error);
                     }
                 } catch (error) {
-                    console.error('Network error submitting score:', error);
+                    console.error('Network error during score submission:', error);
                 }
             }
         };
         submitScore();
-    }, [quizFinished, performance, currentCandidateId, userAnswers, dispatch]);
+    }, [quizFinished, performanceMetrics, currentCandidateId, userAnswers, dispatch]);
  
     // --- Event Handler for Restarting Quiz ---
     const handleTryAgain = () => {
+        if (currentCandidateId) {
+            dispatch(clearCandidateAiSummary(currentCandidateId));
+        }
         dispatch(resetInterviewState());
     };
     
@@ -246,12 +244,12 @@ export default function QuestionPage() {
     if (loadingQuestions || (!currentQuestion && !quizFinished)) {
         return <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">Loading Questions...</div>;
     }
- 
+
     return (
         <div className="flex items-center justify-center min-h-screen bg-slate-900 font-sans p-4 relative overflow-hidden">
             <div className="absolute top-0 -left-1/4 w-96 h-96 bg-blue-600/50 rounded-full filter blur-3xl opacity-20 animate-pulse"></div>
             <div className="absolute bottom-0 -right-1/a w-96 h-96 bg-purple-600/50 rounded-full filter blur-3xl opacity-20 animate-pulse animation-delay-4000"></div>
- 
+
             <div className="w-full max-w-6xl bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-2xl shadow-2xl p-8 grid md:grid-cols-2 gap-12 z-10">
                 
                 {/* Left Side: Question or Results */}
@@ -260,13 +258,13 @@ export default function QuestionPage() {
                         <>
                             <div className="flex justify-between items-baseline">
                                 <p className="text-lg font-semibold text-blue-400 mb-2">Question {currentQuestionIndex + 1}/{quizQuestions.length}</p>
-                                <span className={`px-3 py-1 text-sm font-bold rounded-full ${
+                                {currentQuestion.difficulty && <span className={`px-3 py-1 text-sm font-bold rounded-full ${
                                     currentQuestion.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
                                     currentQuestion.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
                                     'bg-red-500/20 text-red-400'
                                 }`}>
                                     {currentQuestion.difficulty}
-                                </span>
+                                </span>}
                             </div>
                             <h2 className="text-2xl md:text-3xl font-bold text-slate-100 leading-tight my-8 min-h-[100px]">
                                 {currentQuestion.question}
@@ -297,7 +295,7 @@ export default function QuestionPage() {
                         </div>
                     )}
                 </div>
- 
+
                 {/* Right Side: Info & Controls */}
                 <div className="flex flex-col items-center justify-between bg-slate-900/70 p-6 rounded-xl border border-slate-700">
                     <div className="w-full flex justify-between items-center">
@@ -307,15 +305,19 @@ export default function QuestionPage() {
                         </div>
                         <button className="text-slate-400 hover:text-white"><MoreHorizontal size={24} /></button>
                     </div>
- 
+
                     {!quizFinished ? <CircularTimer timeLeft={timeLeft} totalTime={totalTime} /> : <div className="text-green-400 text-center my-auto"><h3 className="text-2xl font-bold">Finished!</h3></div>} 
- 
+
                     <div className="w-full space-y-4">
                         <div className="bg-slate-800/80 p-4 rounded-lg">
                             <h4 className="font-semibold text-slate-200 mb-2">Your Performance</h4>
                             <div className="text-sm text-slate-400 space-y-2">
-                                <p>Accuracy: <span className="font-bold text-2xl text-cyan-400">{performance ? `${performance.accuracy.toFixed(0)}%` : '--%'}</span></p>
-                                <p>Avg. Time / Q: <span className="font-bold text-2xl text-cyan-400">{performance ? `${performance.avgTime.toFixed(1)}s` : '--s'}</span></p>
+                                <p>Accuracy: <span className="font-bold text-2xl text-cyan-400">
+                                    {(performanceMetrics && typeof performanceMetrics.accuracy === 'number') ? `${performanceMetrics.accuracy.toFixed(0)}%` : '--%'}
+                                </span></p>
+                                <p>Avg. Time / Q: <span className="font-bold text-2xl text-cyan-400">
+                                    {(performanceMetrics && typeof performanceMetrics.avgTime === 'number') ? `${performanceMetrics.avgTime.toFixed(1)}s` : '--s'}
+                                </span></p>
                             </div>
                         </div>
                         <button className="w-full py-3 bg-red-600/20 border border-red-500/50 text-red-400 font-bold rounded-lg hover:bg-red-600/40 transition-colors duration-300">

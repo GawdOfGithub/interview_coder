@@ -5,7 +5,8 @@ import InterviewerMockUI from '../features/InterviewerMockUI';
 
 const Features = () => {
     const intervieweeFeatures = ["Practice with AI", "Get Instant Feedback", "Track Your Progress"];
-    const interviewerFeatures = ["Manage Candidates", "AI Summaries", "Data-Driven Hiring"];
+    const interviewerFeatures = ["AI Powered Quiz", "AI Summaries", "Data-Driven Practice"];
+
 
     return (
         <section className="py-20">

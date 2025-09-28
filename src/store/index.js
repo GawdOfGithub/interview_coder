@@ -23,7 +23,7 @@ const persistConfig = {
     key: 'root',
     storage,
     // Best practice: only persist the slice you need
-    whitelist: ['interview'],
+    whitelist: ['interview', 'candidates'],
 };
 
 const persistedReducer = persistReducer(persistConfig, rootReducer);

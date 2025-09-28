@@ -1,22 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, MoreHorizontal, Paperclip, Bot, User, SendHorizontal, Search, Filter, ChevronDown } from 'lucide-react';
+import { Menu, Paperclip, Bot, User, SendHorizontal, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
     setActiveTab,
-    setResumeFile,
     setExtractedName,
     setIsLoading,
     setError,
     setInterviewStarted,
     setCurrentCandidateId
 } from '../store/slices/interviewSlice';
-import { addCandidate, updateCandidateChatHistory, fetchCandidateScores, fetchAllCandidates, selectChatHistoryByCandidateId } from '../store/slices/candidatesSlice';
+import { addCandidate, updateCandidateChatHistory, fetchAllCandidates, fetchCandidateScores, selectChatHistoryByCandidateId } from '../store/slices/candidatesSlice';
 
-// --- Mock Data ---
 
-// --- Components ---
-
+// --- Child Components ---
 const HeaderTabs = () => {
     const dispatch = useDispatch();
     const activeTab = useSelector((state) => state.interview.activeTab);
@@ -48,8 +45,7 @@ const HeaderTabs = () => {
 };
 
 const WindowFrame = ({ children, title }) => (
-    <div className="bg-[#2d3748] bg-opacity-80 backdrop-blur-sm border border-gray-600/50 rounded-xl shadow-2xl w-100vw mx-auto overflow-hidden">
-        {/* Window header */}
+    <div className="bg-[#2d3748] bg-opacity-80 backdrop-blur-sm border border-gray-600/50 rounded-xl shadow-2xl w-full mx-auto overflow-hidden">
         <div className="flex items-center justify-between p-3 border-b border-gray-700/50">
             <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-red-500 rounded-full"></div>
@@ -57,13 +53,10 @@ const WindowFrame = ({ children, title }) => (
                 <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
             <div className="text-gray-300 font-semibold text-sm">{title}</div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 opacity-50">
                 <Menu size={18} className="text-gray-400" />
-                <div className="w-px h-5 bg-gray-600"></div>
-                <MoreHorizontal size={18} className="text-gray-400" />
             </div>
         </div>
-        {/* Window content */}
         <main className="min-h-[70vh]">
             {children}
         </main>
@@ -81,16 +74,14 @@ const UploadView = ({ onFileSelect, isLoading, error }) => {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center text-gray-300 p-6 md:p-10">
             <div className="bg-blue-500/10 p-6 rounded-full mb-8 border border-blue-500/20">
-                 <Bot className="w-20 h-20 text-blue-400" strokeWidth={1.5} />
+                <Bot className="w-20 h-20 text-blue-400" strokeWidth={1.5} />
             </div>
-           
             <h2 className="text-3xl font-bold text-white mb-4">Upload resume to get started</h2>
             <p className="text-gray-400 max-w-md mb-8">
                 Our AI will analyze your resume to tailor a personalized interview experience for you.
             </p>
             {isLoading && <p className="text-blue-400 mt-4">Processing resume, please wait...</p>}
             {error && <p className="text-red-400 mt-4">Error: {error}</p>}
-    
             <div>
                 <label htmlFor="resume-upload" className={`w-full cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg inline-flex items-center justify-center transition-all duration-300 shadow-lg hover:shadow-blue-500/50 transform hover:-translate-y-1 ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                     <Paperclip size={20} className="mr-3"/>
@@ -108,57 +99,39 @@ const ChatView = ({ extractedName }) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const currentCandidateId = useSelector((state) => state.interview.currentCandidateId);
-    const interviewStarted = useSelector((state) => state.interview.interviewStarted);
-    const chatHistory = useSelector((state) => 
-        selectChatHistoryByCandidateId(state, currentCandidateId) // Use memoized selector
-    );
+    const chatHistory = useSelector((state) => selectChatHistoryByCandidateId(state, currentCandidateId));
+    const chatEndRef = React.useRef(null);
 
-    React.useEffect(() => {
-        console.log('ChatView mounted/updated. Current chat history:', chatHistory); // Debugging
+    useEffect(() => {
+        // This check ensures we only add the greeting if this specific candidate's chat is empty.
         if (chatHistory.length === 0 && extractedName && currentCandidateId) {
-            // Initialize chat history with the greeting message
             dispatch(updateCandidateChatHistory({
                 candidateId: currentCandidateId,
-                message: { sender: 'ai', text: `Hi ${extractedName}, all your details have been extracted. Please enter "Start" to begin your interview.` }
+                message: { sender: 'ai', text: `Hi ${extractedName}, all your details have been extracted. Please type "Start" to begin your interview.` }
             }));
         }
-    }, [chatHistory, currentCandidateId, extractedName, dispatch]);
+    // ✅ FIX: The effect should only run when a new candidate is identified.
+    }, [extractedName, currentCandidateId, dispatch]);
+
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatHistory]);
 
     const handleSendMessage = (e) => {
         e.preventDefault();
         if (newMessage.trim() === '') return;
-    
+
         const userMessage = { sender: 'user', text: newMessage };
         dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: userMessage }));
-    
-        // --- REVISED LOGIC ---
-        // Always prioritize the 'start' command to begin or restart the interview.
+
         if (newMessage.trim().toLowerCase() === 'start') {
-            dispatch(setInterviewStarted(true)); // Set the flag to true
-            const aiStartMessage = { 
-                sender: 'ai', 
-                text: `Great! Let's begin. Based on your experience with React, can you explain the concept of "lifting state up"?` 
-            };
-            dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiStartMessage }));
-            navigate('/question'); // Navigate to the quiz
-        } 
-        // If the interview is in progress and the message is NOT 'start', give a generic response.
-        else if (interviewStarted) {
-            const aiResponse = { 
-                sender: 'ai', 
-                text: 'That\'s a great point. Can you elaborate on when you would choose that approach over using a state management library like Redux or Zustand?' 
-            };
-            dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiResponse }));
-        } 
-        // If the interview has NOT started and the message is NOT 'start', prompt the user.
-        else {
-            const aiPromptMessage = { 
-                sender: 'ai', 
-                text: "Please enter 'Start' to begin the interview." 
-            };
+            dispatch(setInterviewStarted(true));
+            navigate('/question');
+        } else {
+            const aiPromptMessage = { sender: 'ai', text: "Please type 'Start' to begin the interview." };
             dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiPromptMessage }));
         }
-    
+
         setNewMessage('');
     };
 
@@ -179,13 +152,14 @@ const ChatView = ({ extractedName }) => {
                         }`}>
                             <p className="text-sm leading-relaxed">{message.text}</p>
                         </div>
-                         {message.sender === 'user' && (
+                        {message.sender === 'user' && (
                             <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white flex-shrink-0">
                                 <User size={16} />
                             </div>
                         )}
                     </div>
                 ))}
+                <div ref={chatEndRef} />
             </div>
             <div className="p-4 bg-gray-800/50 border-t border-gray-700/50">
                 <form onSubmit={handleSendMessage} className="relative">
@@ -193,7 +167,7 @@ const ChatView = ({ extractedName }) => {
                         type="text" 
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type your answer..."
+                        placeholder="Type 'Start' to begin..."
                         className="w-full bg-gray-700 border border-gray-600 rounded-lg py-3 pl-4 pr-12 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-blue-500 transition-colors">
@@ -207,27 +181,48 @@ const ChatView = ({ extractedName }) => {
 
 const DashboardView = () => {
     const candidates = useSelector((state) => state.candidates.list);
-    const candidatesStatus = useSelector((state) => state.candidates.status); // Get status
-    const dispatch = useDispatch(); 
-    console.log('DashboardView candidates list (from Redux):', candidates); // Debugging
-    console.log('DashboardView candidates status (from Redux):', candidatesStatus); // Debugging
+    const candidatesStatus = useSelector((state) => state.candidates.status);
+    const dispatch = useDispatch();
+    
+    const [isRendered, setIsRendered] = useState(false);
 
     useEffect(() => {
-        if (candidatesStatus === 'idle') { // Only fetch if not already loading or loaded
-            console.log('DashboardView: Dispatching fetchAllCandidates on mount...'); 
-            dispatch(fetchAllCandidates()); 
+        if (candidatesStatus === 'idle') {
+            dispatch(fetchAllCandidates());
         }
     }, [dispatch, candidatesStatus]);
-
+    
     useEffect(() => {
-        console.log('DashboardView: Candidates list changed, fetching individual scores...', candidates.length);
         candidates.forEach(candidate => {
-            if (candidate.id) { 
-                console.log(`DashboardView: Fetching score for candidate ID: ${candidate.id}`); 
+            if (candidate.id && candidate.score == null) {
                 dispatch(fetchCandidateScores(candidate.id));
             }
         });
     }, [candidates, dispatch]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setIsRendered(true), 100);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const getScoreBadge = (score) => {
+        if (score === null || score === undefined) {
+            return <span className="text-gray-400">Pending</span>;
+        }
+        let colorClasses = '';
+        if (score >= 80) {
+            colorClasses = 'bg-green-500/20 text-green-400';
+        } else if (score >= 50) {
+            colorClasses = 'bg-yellow-500/20 text-yellow-400';
+        } else {
+            colorClasses = 'bg-red-500/20 text-red-400';
+        }
+        return (
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${colorClasses}`}>
+                {score}%
+            </span>
+        );
+    };
 
     return (
         <div className="text-white p-6 md:p-10">
@@ -242,14 +237,6 @@ const DashboardView = () => {
                         />
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     </div>
-                    <button className="flex items-center gap-2 bg-[#1a202c]/80 border border-gray-600 rounded-lg py-2 px-4 hover:bg-gray-700 transition">
-                        <span>Sort By: Score</span>
-                        <ChevronDown size={16} />
-                    </button>
-                    <button className="flex items-center gap-2 bg-[#1a202c]/80 border border-gray-600 rounded-lg py-2 px-4 hover:bg-gray-700 transition">
-                        <Filter size={16} />
-                        <span>Filter: All</span>
-                    </button>
                 </div>
             </div>
 
@@ -260,12 +247,15 @@ const DashboardView = () => {
                             <tr>
                                 <th className="p-4 font-semibold tracking-wider">Name</th>
                                 <th className="p-4 font-semibold tracking-wider text-center">Score</th>
-                                <th className="p-4 font-semibold tracking-wider text-center">AI Summary</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {candidates.map((candidate) => (
-                                <tr key={candidate.id} className="border-b border-gray-700/50 hover:bg-gray-700/20 transition">
+                            {candidates.map((candidate, index) => (
+                                <tr 
+                                    key={candidate.id || candidate.candidateId} 
+                                    className={`border-b border-gray-700/50 transition-all duration-500 ease-out hover:bg-gray-700/20 hover:shadow-lg hover:-translate-y-1 ${isRendered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+                                    style={{ transitionDelay: `${index * 50}ms` }}
+                                >
                                     <td className="p-4 font-medium flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center text-white flex-shrink-0">
                                             <User size={16} />
@@ -273,12 +263,7 @@ const DashboardView = () => {
                                         {candidate.name}
                                     </td>
                                     <td className="p-4 text-center">
-                                        {console.log(`DashboardView: Rendering score for ${candidate.name} (ID: ${candidate.id}):`, candidate.score)} 
-                                        {candidate.score !== null ? `${candidate.score}%` : '-'} 
-                                    </td>
-                                    <td className="p-4 font-bold text-center">
-                                        {console.log(`DashboardView: Rendering AI summary for ${candidate.name} (ID: ${candidate.id}):`, candidate.aiSummary)} {/* Debugging */}
-                                        {candidate.aiSummary !== null ? candidate.aiSummary : '-'}
+                                        {getScoreBadge(candidate.score)}
                                     </td>
                                 </tr>
                             ))}
@@ -290,22 +275,16 @@ const DashboardView = () => {
     );
 };
 
+// --- Main Page Component ---
 export default function InterviewPage() {
     const dispatch = useDispatch();
-    const navigate = useNavigate();
-    const [localResumeFile, setLocalResumeFile] = useState(null); // Local state for the File object
-
-    const { activeTab, resumeFile, extractedName, isLoading, error, interviewStarted, currentCandidateId } = useSelector((state) => state.interview);
+    const { activeTab, extractedName, isLoading, error } = useSelector((state) => state.interview);
 
     const handleResumeUpload = async (file) => {
         dispatch(setIsLoading(true));
         dispatch(setError(null));
         dispatch(setExtractedName(null));
-        // Store the actual File object locally
-        setLocalResumeFile(file);
-        // Only dispatch the filename to Redux (serializable)
-        dispatch(setResumeFile(file.name)); 
-
+        
         const formData = new FormData();
         formData.append('resume', file);
 
@@ -319,13 +298,11 @@ export default function InterviewPage() {
 
             if (response.ok) {
                 dispatch(setExtractedName(result.data.name));
-                // Use the candidateId returned by the backend
-                const newCandidateId = result.data.candidateId; 
+                const newCandidateId = result.data.candidateId;
                 dispatch(addCandidate({ id: newCandidateId, name: result.data.name, score: null, aiSummary: null, chatHistory: [] }));
                 dispatch(setCurrentCandidateId(newCandidateId));
             } else {
                 dispatch(setError(result.error || 'An unknown error occurred.'));
-                dispatch(setExtractedName(result.extractedData?.name || null));
             }
         } catch (err) {
             dispatch(setError('Failed to connect to the server. Please ensure the backend is running.'));
@@ -339,19 +316,17 @@ export default function InterviewPage() {
         if (extractedName) {
             return <ChatView extractedName={extractedName} />;
         }
-        // Pass localResumeFile for upload logic if needed elsewhere, though formData uses it directly
         return <UploadView onFileSelect={handleResumeUpload} isLoading={isLoading} error={error} />;
     };
     
     const getTitle = () => {
-        if(activeTab === 'interviewer') return "Interviewer Dashboard";
-        if(localResumeFile) return "AI Interview Practice"; // Use local state for conditional rendering
+        if (activeTab === 'interviewer') return "Interviewer Dashboard";
+        if (extractedName) return "AI Interview Chat";
         return "AI Interview Assistant";
-    }
+    };
 
     return (
         <div className="min-h-screen w-full bg-[#1a202c] font-sans text-gray-200 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-            {/* Background decorative grid */}
             <div className="absolute inset-0 z-0 opacity-10">
                 <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
                     <defs>
@@ -367,7 +342,6 @@ export default function InterviewPage() {
                 </svg>
             </div>
             
-            {/* Main Content */}
             <div className="z-10 w-full max-w-5xl">
                 <HeaderTabs />
                 <WindowFrame title={getTitle()}>
@@ -377,4 +351,3 @@ export default function InterviewPage() {
         </div>
     );
 }
-

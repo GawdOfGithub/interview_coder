@@ -21,9 +21,9 @@ const Hero = () => {
                             <Link to="/interview" className="bg-purple-600 text-white hover:bg-purple-700 text-black font-bold py-3 px-8 rounded-lg transition-transform transform hover:scale-105 shadow-lg shadow-purple-500/20">
                                 Start Free Interview
                             </Link>
-                            <a href="#" className=" bg-opacity-10 hover:bg-opacity-20 border border-gray-600 text-white font-bold py-3 px-8 rounded-lg transition-all transform hover:scale-105">
+                            {/* <a href="#" className=" bg-opacity-10 hover:bg-opacity-20 border border-gray-600 text-white font-bold py-3 px-8 rounded-lg transition-all transform hover:scale-105">
                                 Explore Features
-                            </a>
+                            </a> */}
                         </div>
                     </div>
                     <div className="flex items-center justify-center">
