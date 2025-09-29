@@ -10,15 +10,12 @@ import {
     setInterviewStarted,
     setCurrentCandidateId
 } from '../store/slices/interviewSlice';
-// ✅ 1. IMPORT `selectCandidateById` TO GET THE CURRENT CANDIDATE'S DATA
-import { addCandidate, updateCandidateChatHistory, fetchAllCandidates, fetchCandidateScores, selectChatHistoryByCandidateId, selectCandidateById } from '../store/slices/candidatesSlice';
+import { addCandidate, updateCandidateChatHistory, fetchAllCandidates, fetchCandidateScores, selectCandidateById } from '../store/slices/candidatesSlice';
 import { persistor } from '../store';
 import { resetInterviewState } from '../store/slices/interviewSlice';
 import { resetCandidatesState } from '../store/slices/candidatesSlice';
 
-
-
-// --- Child Componentszz ---
+// --- Child Components ---
 const HeaderTabs = () => {
     const dispatch = useDispatch();
     const activeTab = useSelector((state) => state.interview.activeTab);
@@ -104,7 +101,6 @@ const ChatView = ({ extractedName }) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const currentCandidateId = useSelector((state) => state.interview.currentCandidateId);
-    // ✅ 2. GET THE FULL CANDIDATE OBJECT, NOT JUST THE CHAT HISTORY
     const currentCandidate = useSelector((state) => selectCandidateById(state, currentCandidateId));
     const chatHistory = currentCandidate?.chatHistory || [];
     const chatEndRef = React.useRef(null);
@@ -116,7 +112,7 @@ const ChatView = ({ extractedName }) => {
                 message: { sender: 'ai', text: `Hi ${extractedName}, all your details have been extracted. Please type "Start" to begin your interview.` }
             }));
         }
-    }, [extractedName, currentCandidateId, dispatch]);
+    }, [extractedName, currentCandidateId, dispatch, chatHistory.length]);
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -129,14 +125,10 @@ const ChatView = ({ extractedName }) => {
         const userMessage = { sender: 'user', text: newMessage };
         dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: userMessage }));
 
-        // ✅ 3. ADD REDIRECTION LOGIC HERE
         if (newMessage.trim().toLowerCase() === 'start') {
-            // Check if the current candidate exists and has completed the quiz
             if (currentCandidate && currentCandidate.quizCompleted) {
-                // If yes, navigate to their profile page
                 navigate(`/profile/${currentCandidateId}`);
             } else {
-                // If no, proceed to the quiz as normal
                 dispatch(setInterviewStarted(true));
                 navigate('/question');
             }
@@ -193,12 +185,10 @@ const ChatView = ({ extractedName }) => {
 };
 
 const DashboardView = () => {
-    // ... (This component remains unchanged)
     const candidates = useSelector((state) => state.candidates.list);
     const candidatesStatus = useSelector((state) => state.candidates.status);
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    
     const [isRendered, setIsRendered] = useState(false);
 
     useEffect(() => {
@@ -254,7 +244,6 @@ const DashboardView = () => {
                     </div>
                 </div>
             </div>
-
             <div className="bg-[#1a202c]/50 rounded-lg overflow-hidden border border-gray-700/50 ">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
@@ -299,68 +288,65 @@ const DashboardView = () => {
     );
 };
 
-
 // --- Main Page Component ---
 export default function InterviewPage() {
     const dispatch = useDispatch();
     const navigate = useNavigate(); 
     const { activeTab, extractedName, isLoading, error } = useSelector((state) => state.interview);
+    
     const handleResumeUpload = async (file) => {
         await persistor.purge();
         dispatch(resetInterviewState());
         dispatch(resetCandidatesState());
-    
         dispatch(setIsLoading(true));
         
         const formData = new FormData();
         formData.append('resume', file);
+    
         try {
-            const response = await fetch("https://interview-coder-1.onrender.com/parse-resume", {
+            // It's a Vite app, so we use import.meta.env
+            const apiUrl = import.meta.env.VITE_API_URL;
+            const response = await fetch(`${apiUrl}/parse-resume`, {
                 method: 'POST',
                 body: formData,
             });
-        } catch (error) {
-            console.error(error);
-        }
-        
     
             const result = await response.json();
     
-            if (response.ok) {
-                const { name, candidateId, quizCompleted } = result.data;
+            if (!response.ok) {
+                // If the server returns an error, we throw it to be caught by the catch block
+                throw new Error(result.error || 'An unknown error occurred.');
+            }
+    
+            const { name, candidateId, quizCompleted } = result.data;
 
-                // ✅ 2. ADD THE NEW REDIRECTION LOGIC HERE
-                if (quizCompleted) {
-                    // If the quiz is already completed, navigate directly to the profile page.
-                    // This skips the chat window entirely.
-                    navigate(`/profile/${candidateId}`);
-                } else {
-                    // Otherwise, if the quiz isn't done, proceed with the normal flow
-                    // to show the chat window.
-                    dispatch(setExtractedName(name));
-                    
-                    const newCandidatePayload = { 
-                        id: candidateId, 
-                        name: name, 
-                        score: null, 
-                        aiSummary: null, 
-                        chatHistory: [],
-                        quizCompleted: quizCompleted
-                    };
-                    dispatch(addCandidate(newCandidatePayload));
-                    dispatch(setCurrentCandidateId(candidateId));
-                }
+            if (quizCompleted) {
+                // If the quiz is done, go straight to the profile page
+                navigate(`/profile/${candidateId}`);
             } else {
-                dispatch(setError(result.error || 'An unknown error occurred.'));
+                // Otherwise, show the chat window to start the quiz
+                dispatch(setExtractedName(name));
+                
+                const newCandidatePayload = { 
+                    id: candidateId, 
+                    name: name, 
+                    score: null, 
+                    aiSummary: null, 
+                    chatHistory: [],
+                    quizCompleted: quizCompleted
+                };
+                dispatch(addCandidate(newCandidatePayload));
+                dispatch(setCurrentCandidateId(candidateId));
             }
         } catch (err) {
-            dispatch(setError('Failed to connect to the server. Please ensure the backend is running.'));
+            // This block now catches network errors or errors thrown from a bad response
+            dispatch(setError(err.message || 'Failed to connect to the server. Please ensure the backend is running.'));
             console.error('Error uploading resume:', err);
         } finally {
+            // This will run regardless of success or failure
             dispatch(setIsLoading(false));
         }
     };
-
 
     const renderIntervieweeView = () => {
         if (extractedName) {
