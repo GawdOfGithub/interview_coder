@@ -10,7 +10,12 @@ import {
     setInterviewStarted,
     setCurrentCandidateId
 } from '../store/slices/interviewSlice';
-import { addCandidate, updateCandidateChatHistory, fetchAllCandidates, fetchCandidateScores, selectChatHistoryByCandidateId } from '../store/slices/candidatesSlice';
+// ✅ 1. IMPORT `selectCandidateById` TO GET THE CURRENT CANDIDATE'S DATA
+import { addCandidate, updateCandidateChatHistory, fetchAllCandidates, fetchCandidateScores, selectChatHistoryByCandidateId, selectCandidateById } from '../store/slices/candidatesSlice';
+import { persistor } from '../store';
+import { resetInterviewState } from '../store/slices/interviewSlice';
+import { resetCandidatesState } from '../store/slices/candidatesSlice';
+
 
 
 // --- Child Components ---
@@ -99,18 +104,18 @@ const ChatView = ({ extractedName }) => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
     const currentCandidateId = useSelector((state) => state.interview.currentCandidateId);
-    const chatHistory = useSelector((state) => selectChatHistoryByCandidateId(state, currentCandidateId));
+    // ✅ 2. GET THE FULL CANDIDATE OBJECT, NOT JUST THE CHAT HISTORY
+    const currentCandidate = useSelector((state) => selectCandidateById(state, currentCandidateId));
+    const chatHistory = currentCandidate?.chatHistory || [];
     const chatEndRef = React.useRef(null);
 
     useEffect(() => {
-        // This check ensures we only add the greeting if this specific candidate's chat is empty.
         if (chatHistory.length === 0 && extractedName && currentCandidateId) {
             dispatch(updateCandidateChatHistory({
                 candidateId: currentCandidateId,
                 message: { sender: 'ai', text: `Hi ${extractedName}, all your details have been extracted. Please type "Start" to begin your interview.` }
             }));
         }
-    // ✅ FIX: The effect should only run when a new candidate is identified.
     }, [extractedName, currentCandidateId, dispatch]);
 
     useEffect(() => {
@@ -124,9 +129,17 @@ const ChatView = ({ extractedName }) => {
         const userMessage = { sender: 'user', text: newMessage };
         dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: userMessage }));
 
+        // ✅ 3. ADD REDIRECTION LOGIC HERE
         if (newMessage.trim().toLowerCase() === 'start') {
-            dispatch(setInterviewStarted(true));
-            navigate('/question');
+            // Check if the current candidate exists and has completed the quiz
+            if (currentCandidate && currentCandidate.quizCompleted) {
+                // If yes, navigate to their profile page
+                navigate(`/profile/${currentCandidateId}`);
+            } else {
+                // If no, proceed to the quiz as normal
+                dispatch(setInterviewStarted(true));
+                navigate('/question');
+            }
         } else {
             const aiPromptMessage = { sender: 'ai', text: "Please type 'Start' to begin the interview." };
             dispatch(updateCandidateChatHistory({ candidateId: currentCandidateId, message: aiPromptMessage }));
@@ -180,9 +193,11 @@ const ChatView = ({ extractedName }) => {
 };
 
 const DashboardView = () => {
+    // ... (This component remains unchanged)
     const candidates = useSelector((state) => state.candidates.list);
     const candidatesStatus = useSelector((state) => state.candidates.status);
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     
     const [isRendered, setIsRendered] = useState(false);
 
@@ -247,6 +262,7 @@ const DashboardView = () => {
                             <tr>
                                 <th className="p-4 font-semibold tracking-wider">Name</th>
                                 <th className="p-4 font-semibold tracking-wider text-center">Score</th>
+                                <th className="p-4 font-semibold tracking-wider text-center">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -265,6 +281,14 @@ const DashboardView = () => {
                                     <td className="p-4 text-center">
                                         {getScoreBadge(candidate.score)}
                                     </td>
+                                    <td className="p-4 text-center">
+                                        <button 
+                                            onClick={() => navigate(`/profile/${candidate.id || candidate.candidateId}`)}
+                                            className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-md transition-colors"
+                                        >
+                                            View More
+                                        </button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
@@ -275,32 +299,54 @@ const DashboardView = () => {
     );
 };
 
+
 // --- Main Page Component ---
 export default function InterviewPage() {
     const dispatch = useDispatch();
+    const navigate = useNavigate(); 
     const { activeTab, extractedName, isLoading, error } = useSelector((state) => state.interview);
-
     const handleResumeUpload = async (file) => {
+        await persistor.purge();
+        dispatch(resetInterviewState());
+        dispatch(resetCandidatesState());
+    
         dispatch(setIsLoading(true));
-        dispatch(setError(null));
-        dispatch(setExtractedName(null));
         
         const formData = new FormData();
         formData.append('resume', file);
-
+    
         try {
             const response = await fetch('http://localhost:3000/parse-resume', {
                 method: 'POST',
                 body: formData,
             });
-
+    
             const result = await response.json();
-
+    
             if (response.ok) {
-                dispatch(setExtractedName(result.data.name));
-                const newCandidateId = result.data.candidateId;
-                dispatch(addCandidate({ id: newCandidateId, name: result.data.name, score: null, aiSummary: null, chatHistory: [] }));
-                dispatch(setCurrentCandidateId(newCandidateId));
+                const { name, candidateId, quizCompleted } = result.data;
+
+                // ✅ 2. ADD THE NEW REDIRECTION LOGIC HERE
+                if (quizCompleted) {
+                    // If the quiz is already completed, navigate directly to the profile page.
+                    // This skips the chat window entirely.
+                    navigate(`/profile/${candidateId}`);
+                } else {
+                    // Otherwise, if the quiz isn't done, proceed with the normal flow
+                    // to show the chat window.
+                    dispatch(setExtractedName(name));
+                    
+                    const newCandidatePayload = { 
+                        id: candidateId, 
+                        name: name, 
+                        score: null, 
+                        aiSummary: null, 
+                        chatHistory: [],
+                        quizCompleted: quizCompleted
+                    };
+                    dispatch(addCandidate(newCandidatePayload));
+                    dispatch(setCurrentCandidateId(candidateId));
+                }
             } else {
                 dispatch(setError(result.error || 'An unknown error occurred.'));
             }
@@ -311,6 +357,7 @@ export default function InterviewPage() {
             dispatch(setIsLoading(false));
         }
     };
+
 
     const renderIntervieweeView = () => {
         if (extractedName) {

@@ -37,14 +37,19 @@ export const fetchAllCandidates = createAsyncThunk(
     }
 );
 
+// Define initialState at the top so it can be reused by the reset action
+const initialState = {
+    list: [],
+    status: 'idle',
+    error: null,
+};
+
 const candidatesSlice = createSlice({
     name: 'candidates',
-    initialState: {
-        list: [],
-        status: 'idle',
-        error: null,
-    },
+    initialState,
     reducers: {
+        resetCandidatesState: () => initialState,
+        
         updateCandidateAiSummary: (state, action) => {
             const { candidateId, aiSummary } = action.payload;
             const candidateToUpdate = state.list.find(c => c.id === candidateId);
@@ -129,7 +134,6 @@ const candidatesSlice = createSlice({
                         id: candidate.candidateId,
                         chatHistory: candidate.chatHistory || []
                     };
-                    // Merge fetched data with existing data, preferring fetched data
                     const existingData = existingCandidatesMap.get(candidateData.id) || {};
                     existingCandidatesMap.set(candidateData.id, { ...existingData, ...candidateData });
                 });
@@ -148,6 +152,8 @@ export const selectChatHistoryByCandidateId = createSelector(
     (candidates, candidateId) => 
         candidates.find(c => c.id === candidateId)?.chatHistory || []
 );
+export const selectCandidateById = (state, candidateId) => 
+    state.candidates.list.find(candidate => candidate.id === candidateId);
 
 export const {
     addCandidate, 
@@ -155,7 +161,9 @@ export const {
     updateCandidateScore, 
     updateCandidateAiSummary, 
     clearCandidateAiSummary,
-    clearChatHistory 
+    clearChatHistory,
+    resetCandidatesState,
+
 } = candidatesSlice.actions;
 
 export default candidatesSlice.reducer;

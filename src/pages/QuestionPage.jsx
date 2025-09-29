@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useCallback } from 'react';
 import { MoreHorizontal, RefreshCw } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { 
     incrementScore, 
     addAnswer,
@@ -49,6 +50,7 @@ const CircularTimer = ({ timeLeft, totalTime }) => {
 export default function QuestionPage() {
     // --- State Management ---
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const { 
         currentQuestionIndex, 
         selectedOption, 
@@ -122,12 +124,14 @@ export default function QuestionPage() {
             dispatch(incrementScore());
         }
  
-        dispatch(addAnswer({ 
+        const userAnswers = { 
             question: currentQuestion.question, 
             answer: selectedOption, 
+            correctAnswer: currentQuestion.correctAnswer, // Add correct answer
             isCorrect, 
             timeTaken 
-        }));
+        };
+        dispatch(addAnswer(userAnswers));
         
         handleNextStep();
     }, [selectedOption, currentQuestion, timeLeft, handleNextStep, dispatch]);
@@ -182,25 +186,34 @@ export default function QuestionPage() {
         const submitScore = async () => {
             if (quizFinished && performanceMetrics && currentCandidateId) {
                 try {
+                    // Submit score and user answers to the backend
                     const response = await fetch('http://localhost:3000/submit-quiz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ candidateId: currentCandidateId, score: parseFloat(performanceMetrics.accuracy.toFixed(0)) }),
+                        body: JSON.stringify({ 
+                            candidateId: currentCandidateId, 
+                            score: parseFloat(performanceMetrics.accuracy.toFixed(0)),
+                            userAnswers: userAnswers, // Send the full userAnswers array
+                        }),
                     });
-                    if (!response.ok) throw new Error('Failed to submit score');
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to submit score');
+                    }
                     
                     dispatch(updateCandidateScore({ candidateId: currentCandidateId, scoreValue: parseFloat(performanceMetrics.accuracy.toFixed(0)) }));
 
                     const summaryResponse = await fetch('http://localhost:3000/generate-summary', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            candidateId: currentCandidateId, 
-                            performance: { 
-                                accuracy: performanceMetrics.accuracy.toFixed(0), 
-                                avgTime: performanceMetrics.avgTime.toFixed(1) 
-                            }, 
-                            userAnswers 
+                        body: JSON.stringify({
+                            candidateId: currentCandidateId,
+                            performance: {
+                                accuracy: performanceMetrics.accuracy.toFixed(0),
+                                avgTime: performanceMetrics.avgTime.toFixed(1)
+                            },
+                            userAnswers: userAnswers // Also send to summary generation if needed
                         }),
                     });
                     const summaryResult = await summaryResponse.json();
@@ -209,8 +222,12 @@ export default function QuestionPage() {
                     } else {
                         console.error('Error generating AI summary:', summaryResult.error);
                     }
+                    
+                    // Redirect to profile page after successful submission and summary generation
+                    navigate(`/profile/${currentCandidateId}`);
                 } catch (error) {
                     console.error('Network error during score submission:', error);
+                    dispatch(setError(error.message));
                 }
             }
         };
@@ -219,9 +236,12 @@ export default function QuestionPage() {
  
     // --- Event Handler for Restarting Quiz ---
     const handleTryAgain = () => {
+        // ✅ 2. First, clear the old summary for the current candidate
         if (currentCandidateId) {
             dispatch(clearCandidateAiSummary(currentCandidateId));
         }
+        
+        // Then, reset the interview state to start the quiz again
         dispatch(resetInterviewState());
     };
     

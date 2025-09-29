@@ -2,16 +2,20 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
- import { createBrowserRouter } from "react-router";
-    import { RouterProvider } from "react-router/dom";
+import {
+  createBrowserRouter,
+  RouterProvider,
+} from "react-router-dom";
     import InterviewPage from './pages/InterviewPage.jsx';
     import QuestionPage from './pages/QuestionPage.jsx';
     import { Provider } from 'react-redux';
     import { store, persistor } from './store';
     import { PersistGate } from 'redux-persist/integration/react';
+    import ProfilePage from './pages/ProfilePage.jsx';
 
 
-    const router = createBrowserRouter([
+   // Retype the spaces manually
+const router = createBrowserRouter([
       {
         path: "/",
         element: <App/>
@@ -24,16 +28,20 @@ import App from './App.jsx'
         path: "/question",
         element: <QuestionPage/>
       },
+      {
+        path: "/profile/:candidateId",
+        element: <ProfilePage />
+      }
     ]);
 
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+  // <StrictMode>
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
         <RouterProvider router={router} />
       </PersistGate>
     </Provider>
     
-  </StrictMode>
+  // </StrictMode>
 )

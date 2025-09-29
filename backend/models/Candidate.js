@@ -1,31 +1,35 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const CandidateSchema = new mongoose.Schema({
-    name: {
-        type: String,
-        required: true,
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    phone: { type: String, required: true },
+    candidateId: { type: String, unique: true },
+    resumeText: { type: String },
+    aiSummary: { type: String },
+    chatHistory: [
+        {
+            sender: String,
+            text: String,
+            timestamp: { type: Date, default: Date.now },
+        },
+    ],
+    score: {
+        type: Number,
     },
-    email: {
-        type: String,
-        required: true,
-        unique: true,
-    },
-    phone: {
-        type: String,
-        required: true,
-    },
-    candidateId: {
-        type: String,
-        unique: true,
+    // ✅ 1. ADD THE NEW FIELD
+    quizCompleted: {
+        type: Boolean,
+        default: false,
     },
 });
 
-// Pre-save hook to generate candidateId from name, email, and phone
+// Pre-save hook to generate candidateId
 CandidateSchema.pre('save', function(next) {
     if (this.isNew) {
-        // Concatenate relevant fields and hash them to create a unique ID
         const uniqueString = `${this.name}-${this.email}-${this.phone}`;
-        this.candidateId = require('crypto').createHash('md5').update(uniqueString).digest('hex');
+        this.candidateId = crypto.createHash('md5').update(uniqueString).digest('hex');
     }
     next();
 });
