@@ -9,7 +9,7 @@ const Score = require('./models/Score'); // Import Score model
 const { generateQuizQuestions, generateSummary } = require('./utils/geminiApi'); // Import Gemini utility functions
 
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
