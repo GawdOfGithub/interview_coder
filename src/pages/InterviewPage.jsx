@@ -18,7 +18,7 @@ import { resetCandidatesState } from '../store/slices/candidatesSlice';
 
 
 
-// --- Child Components ---
+// --- Child Componentszz ---
 const HeaderTabs = () => {
     const dispatch = useDispatch();
     const activeTab = useSelector((state) => state.interview.activeTab);
