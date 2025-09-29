@@ -314,12 +314,15 @@ export default function InterviewPage() {
         
         const formData = new FormData();
         formData.append('resume', file);
-    
         try {
-            const response = await fetch(`${apiUrl}/parse-resume`, {
+            const response = await fetch("https://interview-coder-1.onrender.com/parse-resume", {
                 method: 'POST',
                 body: formData,
             });
+        } catch (error) {
+            console.error(error);
+        }
+        
     
             const result = await response.json();
     
