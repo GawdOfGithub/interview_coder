@@ -1,39 +1,51 @@
-const mongoose = require('mongoose');
-const crypto = require('crypto');
+// Make sure you import your Candidate model at the top of the file
+const Candidate = require('./models/Candidate'); // Adjust the path as needed
 
-const CandidateSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    phone: { type: String, required: true },
-    candidateId: { type: String, unique: true },
-    resumeText: { type: String },
-    aiSummary: { type: String },
-    chatHistory: [
-        {
-            sender: String,
-            text: String,
-            timestamp: { type: Date, default: Date.now },
-        },
-    ],
-    score: {
-        type: Number,
-    },
-    // ✅ 1. ADD THE NEW FIELD
-    quizCompleted: {
-        type: Boolean,
-        default: false,
-    },
-});
+// ✅ ADD THIS ENTIRE ROUTE HANDLER
+app.post('/create-candidate', async (req, res) => {
+  try {
+    // 1. Get the name, email, and phone from the request body
+    const { name, email, phone } = req.body;
 
-// Pre-save hook to generate candidateId
-CandidateSchema.pre('save', function(next) {
-    if (this.isNew) {
-        const uniqueString = `${this.name}-${this.email}-${this.phone}`;
-        this.candidateId = crypto.createHash('md5').update(uniqueString).digest('hex');
+    // Basic validation to ensure required fields are present
+    if (!name || !email || !phone) {
+      return res.status(400).json({ error: 'Name, email, and phone are required.' });
     }
-    next();
+
+    // 2. Create a new candidate instance using your model
+    const newCandidate = new Candidate({
+      name,
+      email,
+      phone,
+    });
+
+    // 3. Save the new candidate to the database
+    // The 'pre-save' hook in your schema will automatically generate the candidateId
+    await newCandidate.save();
+
+    // 4. Send a success response back to the frontend with the new candidate's ID
+    res.status(201).json({
+      data: {
+        message: 'Candidate created successfully!',
+        candidateId: newCandidate.candidateId,
+        // Also send back the other details in case the frontend needs them
+        name: newCandidate.name,
+        email: newCandidate.email,
+        phone: newCandidate.phone,
+        quizCompleted: newCandidate.quizCompleted
+      },
+    });
+
+  } catch (error) {
+    console.error('Error creating candidate:', error);
+
+    // This is a special check for duplicate emails (very common!)
+    // MongoDB throws an error with code 11000 for unique constraint violations
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'A candidate with this email already exists.' });
+    }
+
+    // For all other errors, send a generic server error response
+    res.status(500).json({ error: 'An internal server error occurred.' });
+  }
 });
-
-const Candidate = mongoose.model('Candidate', CandidateSchema);
-
-module.exports = Candidate;

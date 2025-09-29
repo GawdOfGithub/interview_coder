@@ -1,13 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
-    setExtractedName,
     setIsLoading,
     setError,
-    setCurrentCandidateId
+    setCurrentCandidateId,
+    setInterviewStarted
 } from '../store/slices/interviewSlice';
-import { addCandidate, selectCandidateById } from '../store/slices/candidatesSlice';
+import { addCandidate } from '../store/slices/candidatesSlice';
 import { persistor } from '../store';
 import { resetInterviewState } from '../store/slices/interviewSlice';
 import { resetCandidatesState } from '../store/slices/candidatesSlice';
@@ -17,18 +17,26 @@ import UploadView from '../components/interview/UploadView';
 import ChatView from '../components/interview/ChatView';
 import DashboardView from '../components/interview/DashboardView';
 
-// --- Main Page Component ---
+
+const QuizCompletedView = () => (
+    <div className="flex items-center justify-center h-full min-h-[70vh] text-center text-gray-300 p-6 md:p-10">
+        <h2 className="text-2xl font-semibold text-white">You have already completed the quiz.</h2>
+    </div>
+);
+
 export default function InterviewPage() {
     const dispatch = useDispatch();
-    const navigate = useNavigate(); 
-    const { activeTab, extractedName, isLoading, error } = useSelector((state) => state.interview);
-    const currentCandidateId = useSelector((state) => state.interview.currentCandidateId);
-    const currentCandidate = useSelector((state) => selectCandidateById(state, currentCandidateId));
-    
+    const navigate = useNavigate();
+    const { activeTab, isLoading, error } = useSelector((state) => state.interview);
+
+    const [flowState, setFlowState] = useState('upload');
+    const [candidateData, setCandidateData] = useState(null);
+
     const handleResumeUpload = async (file) => {
         await persistor.purge();
         dispatch(resetInterviewState());
         dispatch(resetCandidatesState());
+        setFlowState('upload');
         dispatch(setIsLoading(true));
         
         const formData = new FormData();
@@ -41,82 +49,132 @@ export default function InterviewPage() {
             });
     
             const result = await response.json();
-    
-            if (!response.ok) {
-                // If the server returns an error, we throw it to be caught by the catch block
-                throw new Error(result.error || 'An unknown error occurred.');
-            }
-    
-            const { name, candidateId, quizCompleted } = result.data;
 
-            if (quizCompleted) {
-                // If the quiz is done, go straight to the profile page
-                navigate(`/profile/${candidateId}`);
-            } else {
-                // Otherwise, show the chat window to start the quiz
-                dispatch(setExtractedName(name));
+            if (response.ok && result.data) {
+                // --- PATH 1: Successful resume parse (200 OK) ---
+                const { name, email, phone, candidateId, quizCompleted } = result.data;
+                const details = { id: candidateId, name, email, phone, quizCompleted };
                 
-                const newCandidatePayload = { 
-                    id: candidateId, 
-                    name: name, 
-                    score: null, 
-                    aiSummary: null, 
-                    chatHistory: [],
-                    quizCompleted: quizCompleted
-                };
-                dispatch(addCandidate(newCandidatePayload));
+                dispatch(addCandidate({ ...details, score: null, aiSummary: null, chatHistory: [] }));
                 dispatch(setCurrentCandidateId(candidateId));
+
+                if (quizCompleted) {
+                    setFlowState('quiz_completed');
+                } else {
+                    const missing = [];
+                    if (!name) missing.push('name');
+                    if (!email) missing.push('email');
+                    if (!phone) missing.push('phone');
+
+                    if (missing.length === 0) {
+                        dispatch(setInterviewStarted(true));
+                        navigate('/question');
+                    } else {
+                        setCandidateData({ ...details, missing });
+                        setFlowState('collecting_details');
+                    }
+                }
+            } else if (response.status === 400) {
+                // --- PATH 2: Partial failure, manual entry required (400 Bad Request) ---
+                console.warn('Server failed to parse resume, proceeding to manual entry.');
+                
+                // Since the server failed, we create a temporary candidate on the client
+                const tempId = `temp_${Date.now()}`;
+                const missingFields = ['name', 'email', 'phone']; // Ask for all details to be safe
+
+                const details = { id: tempId, name: null, email: null, phone: null, quizCompleted: false, isTemporary: true };
+                
+                dispatch(addCandidate(details));
+                dispatch(setCurrentCandidateId(tempId));
+                setCandidateData({ ...details, missing: missingFields });
+                setFlowState('collecting_details');
+            } else {
+                // --- PATH 3: All other server errors ---
+                throw new Error(result.error || `An unexpected error occurred. Status: ${response.status}`);
             }
         } catch (err) {
-            // This block now catches network errors or errors thrown from a bad response
-            dispatch(setError(err.message || 'Failed to connect to the server. Please ensure the backend is running.'));
+            dispatch(setError(err.message));
             console.error('Error uploading resume:', err);
         } finally {
-            // This will run regardless of success or failure
+            dispatch(setIsLoading(false));
+        }
+    };
+    
+    // ✅ --- This function is now updated to handle temporary candidates ---
+    const handleDetailsCollected = async (collectedDetails) => {
+        dispatch(setIsLoading(true));
+        // Check if the candidate was temporary (created after a 400 error)
+        if (collectedDetails.isTemporary) {
+            console.log("Creating new candidate with manual details:", collectedDetails);
+            try {
+                // IMPORTANT: You will need a new API endpoint to create a candidate from manual data.
+                const createResponse = await fetch("https://interview-coder-1.onrender.com/create-candidate", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        name: collectedDetails.name, 
+                        email: collectedDetails.email, 
+                        phone: collectedDetails.phone 
+                    }),
+                });
+
+                const createResult = await createResponse.json();
+                if (!createResponse.ok) throw new Error(createResult.error || "Failed to create candidate profile.");
+                
+                // You can now proceed with the real data from the backend
+                // dispatch(replaceTempCandidateInStore(collectedDetails.id, createResult.data));
+
+                dispatch(setInterviewStarted(true));
+                navigate('/question');
+
+            } catch (err) {
+                dispatch(setError(`Failed to create profile: ${err.message}`));
+                setFlowState('upload'); // Go back to the upload screen on failure
+            } finally {
+                dispatch(setIsLoading(false));
+            }
+        } else {
+            // This is the original logic for a candidate that was successfully parsed but had missing fields.
+            console.log("Updating candidate with collected details:", collectedDetails);
+            dispatch(addCandidate(collectedDetails)); 
+            dispatch(setInterviewStarted(true));
+            navigate('/question');
             dispatch(setIsLoading(false));
         }
     };
 
     const renderIntervieweeView = () => {
-        if (extractedName) {
-            return <ChatView extractedName={extractedName} />;
+        // ... (This function remains unchanged)
+        switch (flowState) {
+            case 'quiz_completed':
+                return <QuizCompletedView />;
+            case 'collecting_details':
+                return (
+                    <ChatView 
+                        chatMode="collect_details"
+                        detailsToCollect={candidateData}
+                        onDetailsCollected={handleDetailsCollected}
+                    />
+                );
+            case 'upload':
+            default:
+                return <UploadView onFileSelect={handleResumeUpload} isLoading={isLoading} error={error} />;
         }
-        return <UploadView onFileSelect={handleResumeUpload} isLoading={isLoading} error={error} />;
     };
     
     const getTitle = () => {
+        // ... (This function remains unchanged)
         if (activeTab === 'interviewer') return "Interviewer Dashboard";
-        if (extractedName) return "AI Interview Chat";
+        if (flowState === 'collecting_details') return "Finalizing Details";
+        if (flowState === 'quiz_completed') return "Interview Status";
         return "AI Interview Assistant";
     };
-
-    // If user already completed the quiz, avoid loading chat; redirect to profile
-    React.useEffect(() => {
-        if (activeTab === 'interviewee' && currentCandidate && currentCandidate.quizCompleted) {
-            const targetId = currentCandidate.id || currentCandidateId;
-            if (targetId) {
-                navigate(`/profile/${targetId}`);
-            }
-        }
-    }, [activeTab, currentCandidate, currentCandidateId, navigate]);
 
     return (
         <div className="min-h-screen w-full bg-[#1a202c] font-sans text-gray-200 flex flex-col items-center justify-center p-4 relative overflow-hidden">
             <div className="absolute inset-0 z-0 opacity-10">
-                <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-                    <defs>
-                        <pattern id="smallGrid" width="8" height="8" patternUnits="userSpaceOnUse">
-                            <path d="M 8 0 L 0 0 0 8" fill="none" stroke="gray" strokeWidth="0.5"/>
-                        </pattern>
-                        <pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse">
-                            <rect width="80" height="80" fill="url(#smallGrid)"/>
-                            <path d="M 80 0 L 0 0 0 80" fill="none" stroke="gray" strokeWidth="1"/>
-                        </pattern>
-                    </defs>
-                    <rect width="100%" height="100%" fill="url(#grid)" />
-                </svg>
+                 <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="smallGrid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="gray" strokeWidth="0.5"/></pattern><pattern id="grid" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="url(#smallGrid)"/><path d="M 80 0 L 0 0 0 80" fill="none" stroke="gray" strokeWidth="1"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)" /></svg>
             </div>
-            
             <div className="z-10 w-full max-w-5xl">
                 <HeaderTabs />
                 <WindowFrame title={getTitle()}>
