@@ -1,8 +1,7 @@
 import React, {useState, useEffect, useMemo, useCallback } from 'react';
-import { MoreHorizontal, RefreshCw, Pause, Play, X,Rocket} from 'lucide-react';
+import { MoreHorizontal, RefreshCw, Pause, Play } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle, ArrowRight } from 'lucide-react';
 import { 
     incrementScore, 
     addAnswer,
@@ -19,104 +18,13 @@ import {
     
 } from '../store/slices/interviewSlice';
 import { updateCandidateScore, updateCandidateAiSummary, clearCandidateAiSummary } from '../store/slices/candidatesSlice';
-
- const QuizSuccessScreen = ({ onViewResults }) => {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[70vh] text-white p-4">
-                <div className="text-center transform transition-all animate-fade-in-down">
-                    <div className="w-24 h-24 bg-green-500/10 border-2 border-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse-slow-green">
-                        <CheckCircle size={60} className="text-green-400 animate-check-pop-in" />
-                    </div>
-                    <h2 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-green-400 mb-3">
-                        Quiz Submitted!
-                    </h2>
-                    <p className="text-slate-400 text-lg max-w-md mx-auto mb-8">
-                        Your responses have been saved. Our AI is now analyzing your performance.
-                    </p>
-                    <button 
-                        onClick={onViewResults} 
-                        className="group flex items-center justify-center gap-3 py-3 px-8 bg-blue-600 text-white font-bold rounded-lg shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all transform hover:scale-105"
-                    >
-                        View My Results
-                        <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
-                    </button>
-                </div>
-            </div>
-        );
-    };
-
-
-
-// --- Timer Component (Unchanged) ---
-const CircularTimer = ({ timeLeft, totalTime }) => {
-    const radius = 50;
-    const stroke = 8;
-    const normalizedRadius = radius - stroke * 2;
-    const circumference = normalizedRadius * 2 * Math.PI;
-    const strokeDashoffset = totalTime > 0 ? circumference - (timeLeft / totalTime) * circumference : circumference;
-    const getTimerColor = () => {
-        if (totalTime === 0) return 'stroke-cyan-400';
-        const percentage = timeLeft / totalTime;
-        if (percentage <= 0.25) return 'stroke-red-500';
-        if (percentage <= 0.5) return 'stroke-yellow-500';
-        return 'stroke-cyan-400';
-    };
-    return (
-        <div className="relative flex items-center justify-center">
-            <svg height={radius * 2} width={radius * 2} className="-rotate-90">
-                <circle stroke="#374151" fill="transparent" strokeWidth={stroke} r={normalizedRadius} cx={radius} cy={radius} />
-                <circle stroke="currentColor" fill="transparent" strokeWidth={stroke} strokeDasharray={circumference + ' ' + circumference} style={{ strokeDashoffset }} r={normalizedRadius} cx={radius} cy={radius} className={`transition-all duration-500 ease-linear ${getTimerColor()}`} />
-            </svg>
-            <div className="absolute flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-white">{timeLeft}</span>
-                <span className="text-xs text-slate-400">seconds</span>
-            </div>
-        </div>
-    );
-};
-
-const WelcomeBackModal = ({ show, onClose }) => {
-    useEffect(() => {
-        if (show) {
-            // Automatically close the modal after 3 seconds
-            const timer = setTimeout(() => {
-                onClose();
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [show, onClose]);
-
-    if (!show) {
-        return null;
-    }
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
-            <div className="relative bg-slate-900/70 border border-blue-500/30 rounded-2xl p-8 pt-12 text-center w-full max-w-sm shadow-2xl shadow-blue-500/10 transform animate-modal-pop">
-                
-                {/* Background Glow Effect */}
-                <div className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] bg-[radial-gradient(circle_at_center,_rgba(29,78,216,0.15),transparent_40%)] -z-10" />
-                
-                <button 
-                    onClick={onClose} 
-                    className="absolute top-3 right-3 text-slate-500 hover:text-slate-200 transition-colors bg-slate-800/50 rounded-full p-1"
-                >
-                    <X size={20} />
-                </button>
-                
-                <div className="w-20 h-20 bg-blue-500/10 border-2 border-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse-slow">
-                    <Rocket size={40} className="text-blue-400" />
-                </div>
-                
-                <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-slate-100 to-blue-400 mb-2">
-                    Welcome Back!
-                </h2>
-                <p className="text-slate-400 text-lg">
-                    Let's pick up where you left off.
-                </p>
-            </div>
-        </div>
-    );
-};
+import { DUMMY_FULLSTACK_MCQS } from '../components/question/dummyMcqs';
+import MCQView from '../components/question/MCQView';
+import CircularTimer from '../components/question/CircularTimer';
+import WelcomeBackModal from '../components/question/WelcomeBackModal';
+import QuizSuccessScreen from '../components/question/QuizSuccessScreen';
+import Loading from '../components/common/Loading';
+import ErrorNotice from '../components/common/ErrorNotice';
 
 
 // --- Main Interview UI Component ---
@@ -155,14 +63,21 @@ export default function QuestionPage() {
                     throw new Error(`Failed to fetch questions. Server responded with ${response.status}.`);
                 }
                 const data = await response.json();
-                const questionsWithTime = data.map(q => ({ ...q, timeLimit: 60 }));
+                const normalized = Array.isArray(data) ? data : [];
+                const source = normalized.length > 0 ? normalized : DUMMY_FULLSTACK_MCQS;
+                const questionsWithTime = source.map(q => ({ ...q, timeLimit: q.timeLimit ?? 60 }));
                 dispatch(setQuizQuestions(questionsWithTime));
                 if (questionsWithTime.length > 0) {
                     dispatch(setTimeLeft(questionsWithTime[0].timeLimit));
                 }
             } catch (err) {
                 console.error('Error fetching quiz questions:', err);
-                dispatch(setError(err.message));
+                // Fallback to dummy questions when API fails
+                const questionsWithTime = DUMMY_FULLSTACK_MCQS.map(q => ({ ...q, timeLimit: q.timeLimit ?? 60 }));
+                dispatch(setQuizQuestions(questionsWithTime));
+                if (questionsWithTime.length > 0) {
+                    dispatch(setTimeLeft(questionsWithTime[0].timeLimit));
+                }
             } finally {
                 dispatch(setLoadingQuestions(false));
             }
@@ -339,20 +254,11 @@ export default function QuestionPage() {
  
     // --- Render Logic ---
     if (error) {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white p-4">
-                <h2 className="text-2xl text-red-400 mb-4">An Error Occurred</h2>
-                <p className="text-slate-400 mb-6 text-center">{error}</p>
-                <button onClick={handleTryAgain} className="flex items-center justify-center gap-2 py-3 px-6 bg-blue-600 text-white font-bold rounded-lg shadow-lg hover:bg-blue-700 transition-all">
-                    <RefreshCw size={18} />
-                    Try Again
-                </button>
-            </div>
-        );
+        return <ErrorNotice fullScreen title="An Error Occurred" message={error} onRetry={handleTryAgain} />;
     }
     
     if (loadingQuestions || (!currentQuestion && !quizFinished)) {
-        return <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">Loading Questions...</div>;
+        return <Loading fullScreen message="Loading Questions..." />;
     }
 
     return (
@@ -367,37 +273,19 @@ export default function QuestionPage() {
                 {/* Left Side: Question or Results */}
                 <div className="flex flex-col justify-center">
                     {!quizFinished ? (
-                        <>
-                            <div className="flex justify-between items-baseline">
-                                <p className="text-lg font-semibold text-blue-400 mb-2">Question {currentQuestionIndex + 1}/{quizQuestions.length}</p>
-                                {currentQuestion.difficulty && <span className={`px-3 py-1 text-sm font-bold rounded-full ${
-                                    currentQuestion.difficulty === 'Easy' ? 'bg-green-500/20 text-green-400' :
-                                    currentQuestion.difficulty === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                                    'bg-red-500/20 text-red-400'
-                                }`}>
-                                    {currentQuestion.difficulty}
-                                </span>}
-                            </div>
-                            <h2 className="text-2xl md:text-3xl font-bold text-slate-100 leading-tight my-8 min-h-[100px]">
-                                {currentQuestion.question}
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {currentQuestion.options.map((option, index) => (
-                                    <button key={index} onClick={() => dispatch(setSelectedOption(option))} className={`p-4 rounded-lg text-left transition-all duration-300 border-2 ${selectedOption === option ? 'bg-blue-600 border-blue-500 text-white shadow-lg' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-slate-500'}`}>
-                                        <span className={`font-mono mr-3 font-bold ${selectedOption === option ? 'text-white' : 'text-blue-400'}`}>{String.fromCharCode(65 + index)}</span>
-                                        <span className="font-semibold">{option}</span>
-                                    </button>
-                                ))}
-                            </div>
-                            <button onClick={handleSubmit} disabled={!selectedOption} className="w-full mt-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-lg shadow-lg hover:scale-105 transform transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100">
-                                Submit Answer
-                            </button>
-                        </>
+                        <MCQView
+                            currentQuestionIndex={currentQuestionIndex}
+                            totalQuestions={quizQuestions.length}
+                            question={currentQuestion}
+                            options={currentQuestion.options}
+                            selectedOption={selectedOption}
+                            onSelectOption={(option) => dispatch(setSelectedOption(option))}
+                            onSubmit={handleSubmit}
+                        />
                     ) : (
                         <div>
-                        <QuizSuccessScreen onViewResults={() => navigate(`/profile/${currentCandidateId}`)} />
-                      </div>
-                      
+                            <QuizSuccessScreen onViewResults={() => navigate(`/profile/${currentCandidateId}`)} />
+                        </div>
                     )}
                 </div>
 

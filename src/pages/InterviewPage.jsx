@@ -7,7 +7,7 @@ import {
     setError,
     setCurrentCandidateId
 } from '../store/slices/interviewSlice';
-import { addCandidate } from '../store/slices/candidatesSlice';
+import { addCandidate, selectCandidateById } from '../store/slices/candidatesSlice';
 import { persistor } from '../store';
 import { resetInterviewState } from '../store/slices/interviewSlice';
 import { resetCandidatesState } from '../store/slices/candidatesSlice';
@@ -22,6 +22,8 @@ export default function InterviewPage() {
     const dispatch = useDispatch();
     const navigate = useNavigate(); 
     const { activeTab, extractedName, isLoading, error } = useSelector((state) => state.interview);
+    const currentCandidateId = useSelector((state) => state.interview.currentCandidateId);
+    const currentCandidate = useSelector((state) => selectCandidateById(state, currentCandidateId));
     
     const handleResumeUpload = async (file) => {
         await persistor.purge();
@@ -87,6 +89,16 @@ export default function InterviewPage() {
         if (extractedName) return "AI Interview Chat";
         return "AI Interview Assistant";
     };
+
+    // If user already completed the quiz, avoid loading chat; redirect to profile
+    React.useEffect(() => {
+        if (activeTab === 'interviewee' && currentCandidate && currentCandidate.quizCompleted) {
+            const targetId = currentCandidate.id || currentCandidateId;
+            if (targetId) {
+                navigate(`/profile/${targetId}`);
+            }
+        }
+    }, [activeTab, currentCandidate, currentCandidateId, navigate]);
 
     return (
         <div className="min-h-screen w-full bg-[#1a202c] font-sans text-gray-200 flex flex-col items-center justify-center p-4 relative overflow-hidden">

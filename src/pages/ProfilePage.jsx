@@ -2,98 +2,14 @@ import React, { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { MessageCircle, BarChart2, ArrowLeft } from 'lucide-react';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import AiLogo from '../components/profile/AiLogo';
+import AnswerCard from '../components/profile/AnswerCard';
+import PerformanceChart from '../components/profile/PerformanceChart';
+import Loading from '../components/common/Loading';
+import ErrorNotice from '../components/common/ErrorNotice';
 import { fetchCandidateById } from '../store/slices/candidatesSlice';
 import { selectCandidateById } from '../store/slices/candidatesSlice';
 
-// --- Helper Components & Icons ---
-
-const AiLogo = () => (
-    <div className="w-12 h-12 bg-gray-700/50 rounded-lg flex items-center justify-center border border-gray-600">
-        <span className="text-xl font-bold text-white tracking-wider">AI</span>
-    </div>
-);
-
-const CheckIcon = ({ className = "w-6 h-6" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <polyline points="20 6 9 17 4 12"></polyline>
-    </svg>
-);
-
-const XIcon = ({ className = "w-6 h-6" }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-        <line x1="18" y1="6" x2="6" y2="18"></line>
-        <line x1="6" y1="6" x2="18" y2="18"></line>
-    </svg>
-);
-
-const AnswerCard = ({ questionData }) => {
-    const { question, yourAnswer, originalAnswer, isCorrect } = questionData;
-    const cardShadowColor = isCorrect ? 'shadow-green-500/10' : 'shadow-red-500/10';
-
-    return (
-        <div className={`bg-slate-800/60 p-6 rounded-xl border border-slate-700/80 shadow-lg ${cardShadowColor} transition-all hover:shadow-xl hover:border-slate-600`}>
-            <h3 className="font-semibold text-lg text-slate-200 mb-4">{question}</h3>
-            <div className="space-y-3">
-                <div className="flex justify-between items-start">
-                    <p className="text-slate-400">Your Answer:</p>
-                    <p className="text-right text-slate-300 font-medium">{yourAnswer}</p>
-                </div>
-                <div className="flex justify-between items-start">
-                    <p className="text-slate-400">Correct Answer:</p>
-                    <div className="flex items-center gap-2 text-right">
-                        {isCorrect ? (
-                            <span className="text-green-400 text-sm font-semibold flex items-center gap-1">
-                                <CheckIcon className="w-4 h-4" /> Correct
-                            </span>
-                        ) : (
-                            <span className="text-red-400 text-sm font-semibold flex items-center gap-1">
-                                <XIcon className="w-4 h-4" /> Incorrect
-                            </span>
-                        )}
-                        <p className="text-slate-300 font-medium">{originalAnswer}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const PerformanceChart = ({ correct, incorrect }) => {
-    const data = [
-        { name: 'Correct', value: correct },
-        { name: 'Incorrect', value: incorrect },
-    ];
-    const COLORS = ['#10B981', '#EF4444']; // Green-500, Red-500
-
-    return (
-        <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-                <Pie
-                    data={data}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    paddingAngle={5}
-                    dataKey="value"
-                >
-                    {data.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                </Pie>
-                <Tooltip
-                    contentStyle={{
-                        background: '#1E293B', // slate-800
-                        borderColor: '#334155', // slate-700
-                        borderRadius: '0.5rem',
-                    }}
-                />
-            </PieChart>
-        </ResponsiveContainer>
-    );
-};
 
 // --- Main Profile Page Component ---
 export default function ProfilePage() {
@@ -112,40 +28,15 @@ export default function ProfilePage() {
     }, [candidateId, candidate, dispatch]);
 
     if (candidateStatus === 'loading' && !candidate) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white">
-                Loading candidate profile...
-            </div>
-        );
+        return <Loading fullScreen message="Loading candidate profile..." />;
     }
 
     if (error) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-red-400 p-4">
-                <h2 className="text-2xl mb-4">Error loading profile:</h2>
-                <p>{typeof error === 'string' ? error : 'An unknown error occurred.'}</p>
-                <button 
-                    onClick={() => navigate('/')}
-                    className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    Go to Dashboard
-                </button>
-            </div>
-        );
+        return <ErrorNotice fullScreen title="Error loading profile" message={typeof error === 'string' ? error : 'An unknown error occurred.'} onRetry={() => navigate('/')} />;
     }
 
     if (!candidate) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 text-white p-4">
-                <h2 className="text-2xl mb-4">No candidate data found.</h2>
-                <button 
-                    onClick={() => navigate('/')}
-                    className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                    Go to Dashboard
-                </button>
-            </div>
-        );
+        return <ErrorNotice fullScreen title="No candidate data found" message={null} onRetry={() => navigate('/')} />;
     }
 
     const { name, email, phone, aiSummary, chatHistory, score } = candidate;

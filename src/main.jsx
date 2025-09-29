@@ -6,42 +6,50 @@ import {
   createBrowserRouter,
   RouterProvider,
 } from "react-router-dom";
-    import InterviewPage from './pages/InterviewPage.jsx';
-    import QuestionPage from './pages/QuestionPage.jsx';
-    import { Provider } from 'react-redux';
-    import { store, persistor } from './store';
-    import { PersistGate } from 'redux-persist/integration/react';
-    import ProfilePage from './pages/ProfilePage.jsx';
+import InterviewPage from './pages/InterviewPage.jsx';
+import QuestionPage from './pages/QuestionPage.jsx';
+import { Provider } from 'react-redux';
+import { store, persistor } from './store';
+import { PersistGate } from 'redux-persist/integration/react';
+import ProfilePage from './pages/ProfilePage.jsx';
+import ErrorBoundary from './components/common/ErrorBoundary.jsx';
+import ErrorNotice from './components/common/ErrorNotice.jsx';
+import Loading from './components/common/Loading.jsx';
 
-
-   // Retype the spaces manually
 const router = createBrowserRouter([
-      {
-        path: "/",
-        element: <App/>
-      },
-      {
-        path: "/interview",
-        element: <InterviewPage/>
-      },
-      {
-        path: "/question",
-        element: <QuestionPage/>
-      },
-      {
-        path: "/profile/:candidateId",
-        element: <ProfilePage />
-      }
-    ]);
-
-
+  {
+    path: "/",
+    element: <App />,
+    errorElement: <ErrorNotice />
+  },
+  {
+    path: "/interview",
+    element: <InterviewPage />,
+    errorElement: <ErrorNotice />
+  },
+  {
+    path: "/question",
+    element: <QuestionPage />,
+    errorElement: <ErrorNotice />
+  },
+  {
+    path: "/profile/:candidateId",
+    element: <ProfilePage />,
+    errorElement: <ErrorNotice />
+  },
+  {
+    path: "*",
+    element: <ErrorNotice />
+  }
+]);
 createRoot(document.getElementById('root')).render(
   // <StrictMode>
-    <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
+  <Provider store={store}>
+    <PersistGate loading={<Loading />} persistor={persistor}>
+      <ErrorBoundary>
         <RouterProvider router={router} />
-      </PersistGate>
-    </Provider>
-    
+      </ErrorBoundary>
+    </PersistGate>
+  </Provider>
   // </StrictMode>
 )
