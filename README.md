@@ -1,16 +1,95 @@
-# React + Vite
+Crisp: AI-Powered Interview Preparation Platform
+Crisp is a modern web application designed to help job seekers prepare for technical interviews. By leveraging AI to parse resumes and generate personalized quizzes, Crisp provides a tailored practice experience that mimics a real screening process.
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+About The Project
+In today's competitive job market, preparation is key. Crisp was built to bridge the gap between having a good resume and acing the technical interview. It automates the initial screening phase, allowing candidates to practice with questions relevant to their skills while providing recruiters with a streamlined dashboard to view candidate performance.
 
-Currently, two official plugins are available:
+The platform is divided into two main views: an Interviewee side for taking the quiz and a secure Interviewer dashboard for reviewing results.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Key Features
+🤖 AI Resume Parsing: Simply upload a resume (PDF, DOC, DOCX), and our backend extracts the candidate's name and key details to create a profile.
 
-## React Compiler
+🧠 Personalized Technical Quiz: Based on the resume, a timed, multiple-choice quiz is generated to test the candidate's technical knowledge.
 
-The React Compiler is not enabled on this template. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+📊 Interviewer Dashboard: A clean, animated dashboard that lists all candidates, their quiz scores, and provides a quick overview of their performance.
 
-## Expanding the ESLint configuration
+📈 Performance Analytics: After completing a quiz, candidates are redirected to a detailed profile page showing their score, accuracy, and an AI-generated summary of their performance.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+🔄 Persistent Sessions: The application state is saved using Redux Persist, allowing users to refresh the page during a quiz and continue exactly where they left off.
+
+🚀 Built with Modern Technologies: A fast, responsive frontend built with React and a robust backend powered by Node.js and Express.
+
+Built With
+This project is built with a modern MERN-like stack:
+
+Frontend:
+
+React.js
+
+Redux Toolkit for state management
+
+React Router for navigation
+
+Tailwind CSS for styling
+
+Vite for the build tool
+
+Backend:
+
+Node.js
+
+Express.js
+
+MongoDB with Mongoose
+
+Multer for file uploads
+
+Deployment:
+
+The app is designed to be easily containerized with Docker for production.
+
+Getting Started
+To get a local copy up and running, follow these simple steps.
+
+Prerequisites
+Make sure you have Node.js and MongoDB installed on your system.
+
+Node.js: npm install npm@latest -g
+
+MongoDB: Follow the installation guide at mongodb.com.
+
+Installation
+Clone the repo
+
+git clone [https://github.com/GawdOfGithub/interview_coder.git](https://github.com/GawdOfGithub/interview_coder.git)
+
+Install Backend Dependencies
+
+cd interview_coder/backend
+npm install
+
+Install Frontend Dependencies
+
+cd ../interviewee
+npm install
+
+Set up Environment Variables
+
+In the backend folder, create a .env file and add your MongoDB connection string:
+
+MONGO_URI=mongodb://localhost:27017/crisp_database
+
+Run the Development Servers
+
+To run the backend server (from the backend directory):
+
+node index.js
+
+To run the frontend development server (from the interviewee directory):
+
+npm run dev
+
+The application will now be running on your local machine.
+
+License
+Distributed under the MIT License. See LICENSE.txt for more information.
