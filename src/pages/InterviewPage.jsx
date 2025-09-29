@@ -304,9 +304,7 @@ export default function InterviewPage() {
         formData.append('resume', file);
     
         try {
-            // It's a Vite app, so we use import.meta.env
-            const apiUrl = import.meta.env.VITE_API_URL;
-            const response = await fetch(`${apiUrl}/parse-resume`, {
+            const response = await fetch("https://interview-coder-1.onrender.com/parse-resume", {
                 method: 'POST',
                 body: formData,
             });
