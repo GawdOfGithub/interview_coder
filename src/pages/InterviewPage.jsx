@@ -316,7 +316,7 @@ export default function InterviewPage() {
         formData.append('resume', file);
     
         try {
-            const response = await fetch('http://localhost:3000/parse-resume', {
+            const response = await fetch(`${apiUrl}/parse-resume`, {
                 method: 'POST',
                 body: formData,
             });

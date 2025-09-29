@@ -150,7 +150,7 @@ export default function QuestionPage() {
             dispatch(setLoadingQuestions(true));
             dispatch(setError(null));
             try {
-                const response = await fetch('http://localhost:3000/questions?limit=5');
+                const response = await fetch('https://interview-coder-1.onrender.com/questions?limit=5');
                 if (!response.ok) {
                     throw new Error(`Failed to fetch questions. Server responded with ${response.status}.`);
                 }
@@ -277,7 +277,7 @@ export default function QuestionPage() {
             if (quizFinished && performanceMetrics && currentCandidateId) {
                 try {
                     // Submit score and user answers to the backend
-                    const response = await fetch('http://localhost:3000/submit-quiz', {
+                    const response = await fetch('https://interview-coder-1.onrender.com/submit-quiz', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
@@ -294,7 +294,7 @@ export default function QuestionPage() {
                     
                     dispatch(updateCandidateScore({ candidateId: currentCandidateId, scoreValue: parseFloat(performanceMetrics.accuracy.toFixed(0)) }));
 
-                    const summaryResponse = await fetch('http://localhost:3000/generate-summary', {
+                    const summaryResponse = await fetch('https://interview-coder-1.onrender.com/generate-summary', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({

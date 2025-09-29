@@ -6,7 +6,7 @@ export const fetchCandidateScores = createAsyncThunk(
     'candidates/fetchCandidateScores',
     async (candidateId, { rejectWithValue }) => {
         try {
-            const response = await fetch(`http://localhost:3000/scores/${candidateId}`);
+            const response = await fetch(`https://interview-coder-1.onrender.com/scores/${candidateId}`);
             if (!response.ok) {
                 const errorData = await response.json();
                 return rejectWithValue(errorData);
@@ -24,7 +24,7 @@ export const fetchCandidateById = createAsyncThunk(
     'candidates/fetchById',
     async (candidateId, { rejectWithValue }) => {
       try {
-        const response = await fetch(`http://localhost:3000/candidates/${candidateId}`);
+        const response = await fetch(`https://interview-coder-1.onrender.com/candidates/${candidateId}`);
         if (!response.ok) {
           const errorData = await response.json();
           return rejectWithValue(errorData.error || 'Failed to fetch candidate');
@@ -43,7 +43,7 @@ export const fetchAllCandidates = createAsyncThunk(
     'candidates/fetchAllCandidates',
     async (_, { rejectWithValue }) => {
         try {
-            const response = await fetch(`http://localhost:3000/candidates`);
+            const response = await fetch(`https://interview-coder-1.onrender.com/candidates`);
             if (!response.ok) {
                 const errorData = await response.json();
                 return rejectWithValue(errorData);
