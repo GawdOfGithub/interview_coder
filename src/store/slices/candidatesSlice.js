@@ -19,6 +19,25 @@ export const fetchCandidateScores = createAsyncThunk(
     }
 );
 
+
+export const fetchCandidateById = createAsyncThunk(
+    'candidates/fetchById',
+    async (candidateId, { rejectWithValue }) => {
+      try {
+        const response = await fetch(`http://localhost:3000/candidates/${candidateId}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          return rejectWithValue(errorData.error || 'Failed to fetch candidate');
+        }
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        return rejectWithValue(error.message);
+      }
+    }
+  );
+  
+
 // Async thunk to fetch all candidates
 export const fetchAllCandidates = createAsyncThunk(
     'candidates/fetchAllCandidates',
@@ -96,6 +115,8 @@ const candidatesSlice = createSlice({
             }
         },
     },
+    
+    
     extraReducers: (builder) => {
         builder
             .addCase(fetchCandidateScores.pending, (state) => {
@@ -103,18 +124,9 @@ const candidatesSlice = createSlice({
             })
             .addCase(fetchCandidateScores.fulfilled, (state, action) => {
                 const { candidateId, scores } = action.payload;
-                let candidateToUpdate = state.list.find(c => c.id === candidateId);
-
-                if (!candidateToUpdate) {
-                    candidateToUpdate = state.list.find(c => c.id === action.meta.arg);
-                }
-
+                const candidateToUpdate = state.list.find(c => c.id === candidateId || c.candidateId === candidateId);
                 if (candidateToUpdate) {
-                    if (scores.length > 0) {
-                        candidateToUpdate.score = scores[0].score;
-                    } else {
-                        candidateToUpdate.score = null;
-                    }
+                    candidateToUpdate.score = scores.length > 0 ? scores[0].score : null;
                 }
             })
             .addCase(fetchCandidateScores.rejected, (state, action) => {
@@ -127,25 +139,49 @@ const candidatesSlice = createSlice({
             .addCase(fetchAllCandidates.fulfilled, (state, action) => {
                 state.status = 'succeeded';
                 const existingCandidatesMap = new Map(state.list.map(c => [c.id, c]));
-                
                 action.payload.forEach(candidate => {
                     const candidateData = {
                         ...candidate,
-                        id: candidate.candidateId,
+                        id: candidate.candidateId, // Ensure 'id' field exists
                         chatHistory: candidate.chatHistory || []
                     };
                     const existingData = existingCandidatesMap.get(candidateData.id) || {};
                     existingCandidatesMap.set(candidateData.id, { ...existingData, ...candidateData });
                 });
-
                 state.list = Array.from(existingCandidatesMap.values());
             })
             .addCase(fetchAllCandidates.rejected, (state, action) => {
                 state.status = 'failed';
                 state.error = action.payload;
+            })
+            // ✅ ADD THESE THREE HANDLERS FOR YOUR NEW THUNK
+            .addCase(fetchCandidateById.pending, (state) => {
+                state.status = 'loading';
+            })
+            .addCase(fetchCandidateById.fulfilled, (state, action) => {
+                state.status = 'succeeded';
+                const fetchedCandidate = action.payload;
+                // Normalize the ID so we consistently use `id` internally
+                const candidateData = { ...fetchedCandidate, id: fetchedCandidate.candidateId };
+                
+                const index = state.list.findIndex(c => c.id === candidateData.id);
+
+                if (index !== -1) {
+                    // If the candidate already exists, update it with the fresh data
+                    state.list[index] = { ...state.list[index], ...candidateData };
+                } else {
+                    // If not, add them to the list
+                    state.list.push(candidateData);
+                }
+            })
+            .addCase(fetchCandidateById.rejected, (state, action) => {
+                state.status = 'failed';
+                state.error = action.payload;
             });
     },
 });
+
+
 
 export const selectChatHistoryByCandidateId = createSelector(
     [(state) => state.candidates.list, (state, candidateId) => candidateId],
