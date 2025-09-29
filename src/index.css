@@ -114,3 +114,19 @@ body {
     background-color: #f9f9f9;
   }
 }
+/* In your index.css file */
+
+@keyframes fadeInDown {
+  from {
+      opacity: 0;
+      transform: translate3d(0, -20%, 0);
+  }
+  to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0);
+  }
+}
+
+.animate-fade-in-down {
+  animation: fadeInDown 0.5s ease-out forwards;
+}

@@ -15,12 +15,13 @@ const initialState = {
     userAnswers: [],
     quizQuestions: [],
     timeLeft: 0,
-    loadingQuestions: false, // Set to false initially, let component trigger loading
+    loadingQuestions: false, 
+    isPaused: false
 };
 
 const interviewSlice = createSlice({
     name: 'interview',
-    initialState, // Use the constant defined above
+    initialState,
     reducers: {
         setActiveTab: (state, action) => {
             state.activeTab = action.payload;
@@ -67,8 +68,6 @@ const interviewSlice = createSlice({
         setLoadingQuestions: (state, action) => {
             state.loadingQuestions = action.payload;
         },
-        
-        // ✅ MOVED THE NEW REDUCERS INSIDE THIS OBJECT
         incrementScore(state) {
             state.score += 1;
         },
@@ -79,11 +78,15 @@ const interviewSlice = createSlice({
             if (state.timeLeft > 0) {
                 state.timeLeft -= 1;
             }
+        }, // ✅ FIXED: Closed the decrementTime reducer here.
+        
+        // ✅ FIXED: Moved togglePause to be its own separate reducer.
+        togglePause: (state) => {
+            state.isPaused = !state.isPaused;
         },
 
         resetInterviewState: (state) => {
-            // Reset to the original initial state, but keep the activeTab and currentCandidateId
-            // This is useful if a user wants to restart a quiz for the same session
+            // Reset to the original initial state, but keep essential session info
             return {
                 ...initialState,
                 activeTab: state.activeTab,
@@ -93,7 +96,6 @@ const interviewSlice = createSlice({
     },
 });
 
-// ✅ ADDED THE NEW ACTIONS TO THE EXPORT LIST
 export const { 
     setActiveTab, 
     setResumeFile, 
@@ -111,10 +113,10 @@ export const {
     setTimeLeft, 
     setLoadingQuestions, 
     resetInterviewState,
-    // New actions
     incrementScore,
     addAnswer,
     decrementTime,
+    togglePause
 } = interviewSlice.actions;
 
 export default interviewSlice.reducer;
